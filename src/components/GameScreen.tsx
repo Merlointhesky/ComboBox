@@ -79,8 +79,21 @@ export const GameScreen: React.FC<GameScreenProps> = ({ godName, planetName, pow
   const [logs, setLogs] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   
-  // Placeholder for AI Planet Image - in real app this would be state initialized with a base gen
-  const [planetImage, setPlanetImage] = useState("https://images.unsplash.com/photo-1614730341194-75c60740a2d3?auto=format&fit=crop&q=80&w=1000");
+  // Helper to generate image URL
+  const getPlanetImageUrl = () => {
+    const elementNames = elements.map(e => e.name).join(', ');
+    // Construct a rich prompt for the AI
+    const prompt = `hyper-realistic majestic planet ${planetName} in space, ruled by god ${godName} (${powers}), featuring landscapes of ${elementNames}, cinematic lighting, 8k resolution, detailed texture`;
+    // Encode the prompt for the URL
+    return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&model=flux&nologo=true&seed=${Math.floor(Math.random() * 1000)}`;
+  };
+
+  // Initialize with a real AI generated image based on initial setup
+  const [planetImage, setPlanetImage] = useState(getPlanetImageUrl());
+
+import axios from 'axios';
+
+// ... existing code ...
 
   const handleCombine = async (sourceId: string, targetId: string) => {
     const source = elements.find(e => e.id === sourceId);
@@ -92,31 +105,105 @@ export const GameScreen: React.FC<GameScreenProps> = ({ godName, planetName, pow
     const newLog = `${godName} combined ${source.name} and ${target.name}...`;
     setLogs(prev => [newLog, ...prev]);
 
-    // TODO: Call Llama AI here
-    console.log(`Combining ${source.name} + ${target.name} with powers: ${powers}`);
+    try {
+      // API Configuration
+      const API_KEY = import.meta.env.VITE_CLOUDFLARE_API_KEY;
+      const ACCOUNT_ID = import.meta.env.VITE_CLOUDFLARE_ACCOUNT_ID;
+      
+      // Fallback for development if keys are missing (or use mock)
+      if (!API_KEY || !ACCOUNT_ID) {
+         throw new Error("Missing Cloudflare Credentials");
+      }
 
-    // Mock AI delay and result
-    setTimeout(() => {
-        // Mock result logic
-        const newElementId = `${source.id}-${target.id}`;
-        // Prevent duplicates for this demo logic
-        if (!elements.find(e => e.id === newElementId)) {
+      // Llama 3 prompt construction
+      const systemPrompt = `You are a game engine for 'Godly Powers'. 
+      You are simulating a world creation game.
+      User (God Name: ${godName}, Powers: ${powers}) is combining two elements: ${source.name} and ${target.name}.
+      Based on the combination and the god's powers, invent a NEW element.
+      Return ONLY a JSON object with this format (no markdown, no other text):
+      {
+        "name": "Creative Name",
+        "emoji": "Relevant Emoji",
+        "description": "Short flavor text describing the creation"
+      }`;
+
+      // Call Cloudflare AI
+      const response = await axios.post(
+        `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/ai/run/@cf/meta/llama-3-8b-instruct`,
+        {
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: `Combine ${source.name} and ${target.name}` }
+          ]
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${API_KEY}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      const result = response.data.result.response || response.data.result; // Handle structure variation
+      
+      let parsedResult;
+      // Try to clean/parse the JSON if the model returns extra text
+      try {
+        const jsonMatch = result.match(/\{[\s\S]*\}/);
+        const jsonStr = jsonMatch ? jsonMatch[0] : result;
+        parsedResult = JSON.parse(jsonStr);
+      } catch (e) {
+        console.warn("Failed to parse AI response, falling back manual", result);
+        parsedResult = {
+           name: `Manifestation of ${source.name} & ${target.name}`,
+           emoji: '✨',
+           description: result.substring(0, 50) + '...'
+        };
+      }
+
+      const newElementId = `${source.id}-${target.id}`;
+        
+      if (!elements.find(e => e.id === newElementId)) {
             const newElement: ElementType = {
                 id: newElementId,
-                name: `Essence of ${source.name} & ${target.name}`,
-                emoji: '✨',
-                description: 'A new manifestation created by your will.'
+                name: parsedResult.name,
+                emoji: parsedResult.emoji,
+                description: parsedResult.description
             };
-            setElements(prev => [...prev, newElement]);
-            setLogs(prev => [`Created ${newElement.name}! The planet evolves.`, ...prev]);
             
-            // Mock image update (in real app, use AI gen prompt here)
-            // setPlanetImage(...) 
+            setElements(prev => {
+                const updated = [...prev, newElement];
+                const currentNames = updated.map(e => e.name).join(', ');
+                const newPrompt = `hyper-realistic majestic planet ${planetName} in space, ruled by god ${godName} (${powers}), featuring landscapes of ${currentNames}, cinematic lighting, 8k resolution, detailed texture`;
+                setPlanetImage(`https://image.pollinations.ai/prompt/${encodeURIComponent(newPrompt)}?width=1024&height=1024&model=flux&nologo=true&seed=${Math.floor(Math.random() * 1000)}`);
+                return updated;
+            });
+
+            setLogs(prev => [`Created ${newElement.name}! The visual appearance of ${planetName} is shifting...`, ...prev]);
+            
         } else {
             setLogs(prev => [`The combination of ${source.name} and ${target.name} is already known.`, ...prev]);
         }
+    } catch (err) {
+        console.error("AI Generation failed:", err);
+        setLogs(prev => ["The creation failed (Check API Keys or Console). Using backup magic...", ...prev]);
+        
+        // Fallback Mock Logic
+        setTimeout(() => {
+            const newElementId = `${source.id}-${target.id}`;
+             if (!elements.find(e => e.id === newElementId)) {
+                const newElement = {
+                    id: newElementId,
+                    name: `Essence of ${source.name} & ${target.name}`,
+                    emoji: '✨',
+                    description: 'A new manifestation created by your will.'
+                };
+                setElements(prev => [...prev, newElement]);
+             }
+        }, 500);
+    } finally {
         setIsGenerating(false);
-    }, 1500);
+    }
   };
 
   return (

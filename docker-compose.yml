@@ -6,6 +6,11 @@ services:
     container_name: combobox_web
     ports:
       - "5174:5173"
+    env_file:
+      - .env
+    environment:
+      - VITE_CLOUDFLARE_API_KEY=${API_KEY}
+      - VITE_CLOUDFLARE_ACCOUNT_ID=${ACCOUNT_ID}
     volumes:
       - ./:/app
       - /app/node_modules
