@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  planet-shaper:
+  combobox:
     build: .
-    container_name: planet_shaper_web
+    container_name: combobox_web
     ports:
       - "5174:5173"
     volumes:

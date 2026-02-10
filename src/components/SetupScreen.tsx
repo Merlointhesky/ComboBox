@@ -25,7 +25,7 @@ export const SetupScreen: React.FC<SetupProps> = ({ onStart }) => {
             <Sparkles className="w-8 h-8 text-white" />
           </div>
         </div>
-        <h1 className="text-3xl font-bold text-center text-gray-800 mb-2">Genesis</h1>
+        <h1 className="text-3xl font-bold text-center text-gray-800 mb-2">ComboBox</h1>
         <p className="text-center text-gray-500 mb-8">Begin your divine journey</p>
         
         <form onSubmit={handleSubmit} className="space-y-6">

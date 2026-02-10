@@ -1,4 +1,4 @@
-# Godly Powers - Planet Shaper
+# ComboBox
 
 A React + Vite game where you play as a god shaping a planet.
 
