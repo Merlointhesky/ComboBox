@@ -35,7 +35,7 @@ const ElementCard = ({ element, onCombine }: ElementCardProps) => {
     collect: (monitor: any) => ({
       isDragging: !!monitor.isDragging(),
     }),
-  }));
+  }), [element.id]); // Added dependency
 
   const [{ isOver }, drop] = useDrop(() => ({
     accept: ItemTypes.ELEMENT,
@@ -47,7 +47,7 @@ const ElementCard = ({ element, onCombine }: ElementCardProps) => {
     collect: (monitor: any) => ({
       isOver: !!monitor.isOver(),
     }),
-  }));
+  }), [element.id, onCombine]); // Added dependency
 
   // Combine refs
   const ref = (node: HTMLDivElement | null) => {
