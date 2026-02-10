@@ -207,13 +207,37 @@ export const GameScreen = ({ godName, planetName, powers, initialElements, onRes
       const tName = target.name.toLowerCase();
       const combo = [sName, tName].sort().join('+');
 
-      if (combo === 'mist+water') {
+      if (combo === 'water+water') {
          await new Promise(r => setTimeout(r, 800)); // Cinematic delay
          parsedResult = {
             name: "Life",
             emoji: "🧬",
             description: "The spark of vitality emerging from the primordial soup.",
             category: "animal"
+         };
+      } else if (combo === 'fire+fire') {
+         await new Promise(r => setTimeout(r, 800));
+         parsedResult = {
+            name: "Energy",
+            emoji: "⚡",
+            description: "Raw power unleashed from the inferno.",
+            category: "science"
+         };
+      } else if (combo === 'earth+earth') {
+         await new Promise(r => setTimeout(r, 800));
+         parsedResult = {
+            name: "Mountain",
+            emoji: "⛰️",
+            description: "Tectonic plates colliding to form peaks.",
+            category: "elements"
+         };
+      } else if (combo === 'air+air') {
+         await new Promise(r => setTimeout(r, 800));
+         parsedResult = {
+            name: "Wind",
+            emoji: "💨",
+            description: "Currents of air sweeping across the void.",
+            category: "elements"
          };
       } 
       else {
@@ -241,10 +265,11 @@ export const GameScreen = ({ godName, planetName, powers, initialElements, onRes
         Classify the result into one of these exact categories: "elements", "animal", "mankind", "ideas", "science".
 
         RULES:
-        1. REALISM FIRST: Prioritize real-world results (e.g., Water + Earth = Mud, Fire + Water = Steam).
+        1. LOGIC & IMAGINATION: Results should be logical but creative. Pseudo-realistic physics apply, but don't be boring.
         2. EVOLUTION: Simple elements combine into complex ones (e.g., Life + Water = Fish, Human + Metal = Robot).
         3. NAMING: Use existing English words (e.g., "Obsidian", "Storm", "Life"). DO NOT use Latin (e.g. "Ignis") or compound nonsense (e.g. "Hydroether").
-        4. SCOPE: Include sci-fi/fantasy tropes (Dragons, Cyborgs, Magic) only when appropriate for complex inputs.
+        4. SCOPE: Embrace Sci-Fi and Fantasy concepts (e.g., Kaiju, Cyborgs, Mana, Spaceships, Mythical Creatures) freely, provided they follow a logical thread from the inputs.
+        5. DIVERSITY: Avoid repeating common results. Dig deep into niche concepts, mythology, or advanced technology.
         
         User (God: ${godName}, Powers: ${powers}) is combining: ${source.name} + ${target.name}.
         
