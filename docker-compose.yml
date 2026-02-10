@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  planet-shaper:
+    build: .
+    container_name: planet_shaper_web
+    ports:
+      - "5174:5173"
+    volumes:
+      - ./:/app
+      - /app/node_modules
+    restart: always
