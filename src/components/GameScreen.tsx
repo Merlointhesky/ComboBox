@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 import { Settings, RefreshCw, ScrollText } from 'lucide-react';
+import axios from 'axios';
 
 interface ElementType {
   id: string;
@@ -90,10 +91,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({ godName, planetName, pow
 
   // Initialize with a real AI generated image based on initial setup
   const [planetImage, setPlanetImage] = useState(getPlanetImageUrl());
-
-import axios from 'axios';
-
-// ... existing code ...
 
   const handleCombine = async (sourceId: string, targetId: string) => {
     const source = elements.find(e => e.id === sourceId);
