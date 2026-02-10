@@ -179,6 +179,13 @@ export const GameScreen = ({ godName, planetName, powers, initialElements, onRes
       const systemPrompt = `You are the logic engine for an alchemy evolution game.
       Your goal is to simulate a logical progression of matter, life, and technology.
       
+      CONCEPTUAL FRAMEWORK:
+      - Water: Acts as a "Life Giver", fluids, cleansing.
+      - Fire: Destruction (burning), but also Transformation (cooking, energy).
+      - Air: Movement/Flight, but also Erosion (destroys rocks/terrain).
+      - Earth: Solidity, Stability, Dirt, Material foundation.
+      - Abstract Concepts are allowed (e.g., Life + Time = Death).
+
       RULES:
       1. REALISM FIRST: Prioritize real-world results (e.g., Water + Earth = Mud, Fire + Water = Steam).
       2. EVOLUTION: Simple elements combine into complex ones (e.g., Life + Water = Fish, Human + Metal = Robot).
@@ -235,9 +242,24 @@ export const GameScreen = ({ godName, planetName, powers, initialElements, onRes
         
       // Race condition safety: Check "prev" state to ensure we don't duplicate
       setElements((prev: ElementType[]) => {
+          // 1. Check ID collision (same parents)
           if (prev.find(e => e.id === newElementId)) {
-             return prev; // Already added by a parallel request
+             return prev; 
           }
+          // 2. Check Name collision (Duplicate result from different parents)
+          // Exception: If the name is generic "Manifestation...", allow it as fallback
+          if (!parsedResult.name.startsWith("Manifestation") && 
+              prev.some(e => e.name.toLowerCase() === parsedResult.name.toLowerCase())) {
+             
+             // We can't update logs directly inside setElements reducer, so we just return prev
+             // The log update below needs to be conditional too? 
+             // Actually, we can just let it fail silently here or handle it separate.
+             // Better: we return prev, and we handle the log outside?
+             // Since we can't communicate 'failure' easily out of this reducer without a ref or effect,
+             // We'll rely on the log update to filter. 
+             return prev;
+          }
+
            const newElement: ElementType = {
                 id: newElementId,
                 name: parsedResult.name,
@@ -247,8 +269,19 @@ export const GameScreen = ({ godName, planetName, powers, initialElements, onRes
             return [...prev, newElement];
       });
 
-      // We still update logs, but only if we think we added it (this log might be slightly off in a race but that's UI only)
-      setLogs((prev: {id: number, text: string}[]) => [{ id: Date.now(), text: `Created ${parsedResult.name}! The visual appearance of ${planetName} is shifting...`}, ...prev]);
+      // Update logs - check if we actually added it
+      // Note: This runs after state update request, but we don't have the *new* state yet in this closure.
+      // We'll use a functional update for logs too, but we need to know if it succeeded.
+      // Since we can't easily know if the setElements reducer rejected it, we'll do a check here too.
+      // This is slightly race-prone but acceptable for UI logs.
+      
+      const isDuplicateName = elements.some(e => e.name.toLowerCase() === parsedResult.name.toLowerCase());
+      
+      if (isDuplicateName) {
+          setLogs((prev: {id: number, text: string}[]) => [{ id: Date.now(), text: `You created ${parsedResult.name}... but you have already discovered it!`}, ...prev]);
+      } else {
+          setLogs((prev: {id: number, text: string}[]) => [{ id: Date.now(), text: `Created ${parsedResult.name}! The visual appearance of ${planetName} is shifting...`}, ...prev]);
+      }
 
     } catch (err) {
         console.error("AI Generation failed:", err);
@@ -284,17 +317,7 @@ export const GameScreen = ({ godName, planetName, powers, initialElements, onRes
         </div>
         
         <div className="flex-1 overflow-y-auto p-4">
-          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Elements</h3>
-          <div className="grid grid-cols-2 gap-3">
-            {elements.map(el => (
-              <ElementCard 
-                key={el.id} 
-                element={el} 
-                onCombine={handleCombine}
-              />
-            ))}
-          </div>
-          <div className="mt-8 pt-4 border-t border-gray-100">
+          <div className="mb-6 pb-4 border-b border-gray-100">
             <button 
                onClick={onReset}
                className="w-full flex items-center justify-center gap-2 bg-red-50 hover:bg-red-100 text-red-600 px-4 py-3 rounded-xl text-sm font-semibold transition-colors"
@@ -302,6 +325,17 @@ export const GameScreen = ({ godName, planetName, powers, initialElements, onRes
                <RefreshCw className="w-4 h-4" />
                Reset Universe
             </button>
+          </div>
+
+          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Elements</h3>
+          <div className="grid grid-cols-2 gap-3">
+            {[...elements].reverse().map(el => (
+              <ElementCard 
+                key={el.id} 
+                element={el} 
+                onCombine={handleCombine}
+              />
+            ))}
           </div>
         </div>
       </div>
