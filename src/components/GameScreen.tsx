@@ -106,7 +106,8 @@ export const GameScreen = ({ godName, planetName, powers, initialElements, onRes
             const ACCOUNT_ID = import.meta.env.VITE_CLOUDFLARE_ACCOUNT_ID;
 
             if (API_KEY && ACCOUNT_ID) {
-                const prompt = `satellite view from orbit showing the curvature of planet ${planetName}, northern hemisphere, space background with stars, terrain features of ${elementNames}, hyper-realistic, 8k, high detail`;
+                // Modified prompt to force a closer orbital view rather than a full planet sphere
+                const prompt = `close-up satellite photography from low orbit looking down at the surface of planet ${planetName}. Visible curved horizon against black space. Detailed terrain landscape of ${elementNames}. 8k, photorealistic, cinematic lighting, national geographic style.`;
                 const response = await axios.post(
                     `/api/cloudflare/accounts/${ACCOUNT_ID}/ai/run/@cf/bytedance/stable-diffusion-xl-lightning`,
                     { prompt },
@@ -285,12 +286,15 @@ export const GameScreen = ({ godName, planetName, powers, initialElements, onRes
               />
             ))}
           </div>
-          <button 
-             onClick={onReset}
-             className="pointer-events-auto bg-white/20 hover:bg-white/40 backdrop-blur-md text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors border border-white/10"
-          >
-             Reset Universe
-          </button>
+          <div className="mt-8 pt-4 border-t border-gray-100">
+            <button 
+               onClick={onReset}
+               className="w-full flex items-center justify-center gap-2 bg-red-50 hover:bg-red-100 text-red-600 px-4 py-3 rounded-xl text-sm font-semibold transition-colors"
+            >
+               <RefreshCw className="w-4 h-4" />
+               Reset Universe
+            </button>
+          </div>
         </div>
       </div>
 
