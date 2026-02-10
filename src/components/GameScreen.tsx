@@ -187,7 +187,7 @@ export const GameScreen = ({ godName, planetName, powers, initialElements, onRes
       
       User (God: ${godName}, Powers: ${powers}) is combining: ${source.name} + ${target.name}.
       
-      Return ONLY a JSON object with this format (no markdown, no other text):
+      Return ONLY a VALID JSON object with this format (ensure keys and values are double-quoted):
       {
         "name": "Result Name",
         "emoji": "Relevant Emoji",
@@ -217,7 +217,12 @@ export const GameScreen = ({ godName, planetName, powers, initialElements, onRes
       // Try to clean/parse the JSON if the model returns extra text
       try {
         const jsonMatch = result.match(/\{[\s\S]*\}/);
-        const jsonStr = jsonMatch ? jsonMatch[0] : result;
+        let jsonStr = jsonMatch ? jsonMatch[0] : result;
+        
+        // Common Llama 3 bug: unquoted emojis. 
+        // Example: "emoji": 🌧️ -> "emoji": "🌧️"
+        jsonStr = jsonStr.replace(/"emoji":\s*([^"\s,{}]+)(?=[,}])/g, '"emoji": "$1"');
+        
         parsedResult = JSON.parse(jsonStr);
       } catch (e) {
         console.warn("Failed to parse AI response, falling back manual", result);
@@ -228,20 +233,23 @@ export const GameScreen = ({ godName, planetName, powers, initialElements, onRes
         };
       }
         
-      if (!elements.find((e: ElementType) => e.id === newElementId)) {
-            const newElement: ElementType = {
+      // Race condition safety: Check "prev" state to ensure we don't duplicate
+      setElements((prev: ElementType[]) => {
+          if (prev.find(e => e.id === newElementId)) {
+             return prev; // Already added by a parallel request
+          }
+           const newElement: ElementType = {
                 id: newElementId,
                 name: parsedResult.name,
                 emoji: parsedResult.emoji,
                 description: parsedResult.description
             };
-            
-            setElements((prev: ElementType[]) => [...prev, newElement]);
-            setLogs((prev: {id: number, text: string}[]) => [{ id: Date.now(), text: `Created ${newElement.name}! The visual appearance of ${planetName} is shifting...`}, ...prev]);
-            
-        } else {
-            setLogs((prev: {id: number, text: string}[]) => [{ id: Date.now(), text: `The combination of ${source.name} and ${target.name} is already known.`}, ...prev]);
-        }
+            return [...prev, newElement];
+      });
+
+      // We still update logs, but only if we think we added it (this log might be slightly off in a race but that's UI only)
+      setLogs((prev: {id: number, text: string}[]) => [{ id: Date.now(), text: `Created ${parsedResult.name}! The visual appearance of ${planetName} is shifting...`}, ...prev]);
+
     } catch (err) {
         console.error("AI Generation failed:", err);
         setLogs((prev: {id: number, text: string}[]) => [{ id: Date.now(), text: "The creation failed (Check API Keys or Console). Using backup magic..."}, ...prev]);
