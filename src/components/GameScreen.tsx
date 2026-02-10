@@ -298,9 +298,6 @@ export const GameScreen = ({ godName, planetName, powers, initialElements, onRes
 
       // Race condition safety: Check "prev" state to ensure we don't duplicate
       setElements((prev: ElementType[]) => {
-        
-      // Race condition safety: Check "prev" state to ensure we don't duplicate
-      setElements((prev: ElementType[]) => {
           // 1. Check ID collision (same parents)
           if (prev.find(e => e.id === newElementId)) {
              return prev; 
