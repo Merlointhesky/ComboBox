@@ -69,7 +69,9 @@ const ElementCard: React.FC<ElementCardProps> = ({ element, onCombine }) => {
     </div>
   );
 };
-, initialElements, onReset }) => {
+
+// --- Main Game Component ---
+export const GameScreen: React.FC<GameScreenProps> = ({ godName, planetName, powers, initialElements, onReset }) => {
   const [elements, setElements] = useState<ElementType[]>(initialElements || [
     { id: 'air', name: 'Air', emoji: '💨', description: 'Gaseous substances' },
     { id: 'water', name: 'Water', emoji: '💧', description: 'Liquid life' },
