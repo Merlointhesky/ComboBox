@@ -96,10 +96,51 @@ export const GameScreen = ({ godName, planetName, powers, initialElements, onRes
 
   // Update image when elements change
   React.useEffect(() => {
-    const elementNames = elements.map(e => e.name).join(', ');
-    const prompt = `hyper-realistic majestic planet ${planetName} in space, ruled by god ${godName} (${powers}), featuring landscapes of ${elementNames}, cinematic lighting, 8k resolution, detailed texture`;
-    const newUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&nologo=true&seed=${Math.floor(Math.random() * 1000)}`;
-    setPlanetImage(newUrl);
+    let isMounted = true;
+    const generateImage = async () => {
+        const elementNames = elements.map(e => e.name).join(', ');
+        
+        // 1. Try Cloudflare AI (High Quality)
+        try {
+            const API_KEY = import.meta.env.VITE_CLOUDFLARE_API_KEY;
+            const ACCOUNT_ID = import.meta.env.VITE_CLOUDFLARE_ACCOUNT_ID;
+
+            if (API_KEY && ACCOUNT_ID) {
+                const prompt = `majestic planet ${planetName}, ${elementNames} landscape, cinematic lighting, photorealistic, 8k, space background`;
+                const response = await axios.post(
+                    `/api/cloudflare/accounts/${ACCOUNT_ID}/ai/run/@cf/bytedance/stable-diffusion-xl-lightning`,
+                    { prompt },
+                    {
+                        headers: { 'Authorization': `Bearer ${API_KEY}` },
+                        responseType: 'blob' 
+                    }
+                );
+                if (isMounted) {
+                    setPlanetImage(URL.createObjectURL(response.data));
+                    return;
+                }
+            }
+        } catch (err) { 
+            console.warn("Cloudflare Image Gen failed, using fallback", err);
+        }
+
+        // 2. Fallback: LoremFlickr (Reliable, Keyword based)
+        // Uses a random keyword from the current elements to get variation
+        const randomKeyword = elements.length > 0 
+            ? elements[Math.floor(Math.random() * elements.length)].name 
+            : 'planet';
+        
+        // Add timestamp to force refresh, otherwise it caches the same "random" image
+        const fallbackUrl = `https://loremflickr.com/1024/1024/space,planet,${encodeURIComponent(randomKeyword)}?lock=${Date.now()}`;
+        
+        if (isMounted) {
+            setPlanetImage(fallbackUrl);
+        }
+    };
+
+    generateImage();
+
+    return () => { isMounted = false; };
   }, [elements, godName, planetName, powers]);
 
   const handleCombine = async (sourceId: string, targetId: string) => {
