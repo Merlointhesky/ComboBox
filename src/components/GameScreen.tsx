@@ -106,7 +106,7 @@ export const GameScreen = ({ godName, planetName, powers, initialElements, onRes
             const ACCOUNT_ID = import.meta.env.VITE_CLOUDFLARE_ACCOUNT_ID;
 
             if (API_KEY && ACCOUNT_ID) {
-                const prompt = `majestic planet ${planetName}, ${elementNames} landscape, cinematic lighting, photorealistic, 8k, space background`;
+                const prompt = `satellite view from orbit showing the curvature of planet ${planetName}, northern hemisphere, space background with stars, terrain features of ${elementNames}, hyper-realistic, 8k, high detail`;
                 const response = await axios.post(
                     `/api/cloudflare/accounts/${ACCOUNT_ID}/ai/run/@cf/bytedance/stable-diffusion-xl-lightning`,
                     { prompt },
@@ -175,15 +175,22 @@ export const GameScreen = ({ godName, planetName, powers, initialElements, onRes
       }
 
       // Llama 3 prompt construction
-      const systemPrompt = `You are a game engine for 'Godly Powers'. 
-      You are simulating a world creation game.
-      User (God Name: ${godName}, Powers: ${powers}) is combining two elements: ${source.name} and ${target.name}.
-      Based on the combination and the god's powers, invent a NEW element.
+      const systemPrompt = `You are the logic engine for an alchemy evolution game.
+      Your goal is to simulate a logical progression of matter, life, and technology.
+      
+      RULES:
+      1. REALISM FIRST: Prioritize real-world results (e.g., Water + Earth = Mud, Fire + Water = Steam).
+      2. EVOLUTION: Simple elements combine into complex ones (e.g., Life + Water = Fish, Human + Metal = Robot).
+      3. NAMING: Use existing English words (e.g., "Obsidian", "Storm", "Life"). DO NOT use Latin (e.g. "Ignis") or compound nonsense (e.g. "Hydroether").
+      4. SCOPE: Include sci-fi/fantasy tropes (Dragons, Cyborgs, Magic) only when appropriate for complex inputs.
+      
+      User (God: ${godName}, Powers: ${powers}) is combining: ${source.name} + ${target.name}.
+      
       Return ONLY a JSON object with this format (no markdown, no other text):
       {
-        "name": "Creative Name",
+        "name": "Result Name",
         "emoji": "Relevant Emoji",
-        "description": "Short flavor text describing the creation"
+        "description": "Short description of what this is"
       }`;
 
       // Call Cloudflare AI via local proxy to avoid CORS
@@ -303,14 +310,13 @@ export const GameScreen = ({ godName, planetName, powers, initialElements, onRes
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 via-[#000000] to-black"></div>
           
           {/* Planet Image */}
-          <div className="relative w-[500px] h-[500px] rounded-full shadow-[0_0_100px_rgba(168,216,234,0.2)] transition-all duration-1000 group">
+          <div className="relative w-full h-full max-w-[90vh] max-h-[90vh] aspect-square p-8 transition-all duration-1000 group">
              <img 
                src={planetImage} 
-               alt="Planet" 
-               className="w-full h-full object-cover rounded-full animate-pulse-slow" 
-               style={{ animationDuration: '10s' }}
+               alt="Planet View" 
+               className="w-full h-full object-cover rounded-2xl shadow-[0_0_100px_rgba(168,216,234,0.1)]"
              />
-             <div className="absolute inset-0 rounded-full ring-inset ring-opacity-20 ring-white shadow-[inset_10px_-10px_50px_rgba(0,0,0,0.5)]"></div>
+             <div className="absolute inset-0 rounded-2xl ring-inset ring-1 ring-white/10 shadow-[inset_0_0_100px_rgba(0,0,0,0.5)] pointer-events-none"></div>
           </div>
           
           {isGenerating && (
