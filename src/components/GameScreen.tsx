@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
-import { Settings, RefreshCw, ScrollText } from 'lucide-react';
+import { RefreshCw, ScrollText } from 'lucide-react';
 import axios from 'axios';
 
 export interface ElementType {
@@ -28,11 +28,11 @@ interface ElementCardProps {
   onCombine: (sourceId: string, targetId: string) => void;
 }
 
-const ElementCard: React.FC<ElementCardProps> = ({ element, onCombine }) => {
+const ElementCard = ({ element, onCombine }: ElementCardProps) => {
   const [{ isDragging }, drag] = useDrag(() => ({
     type: ItemTypes.ELEMENT,
     item: { id: element.id },
-    collect: (monitor) => ({
+    collect: (monitor: any) => ({
       isDragging: !!monitor.isDragging(),
     }),
   }));
@@ -44,7 +44,7 @@ const ElementCard: React.FC<ElementCardProps> = ({ element, onCombine }) => {
         onCombine(item.id, element.id);
       }
     },
-    collect: (monitor) => ({
+    collect: (monitor: any) => ({
       isOver: !!monitor.isOver(),
     }),
   }));
@@ -71,7 +71,7 @@ const ElementCard: React.FC<ElementCardProps> = ({ element, onCombine }) => {
 };
 
 // --- Main Game Component ---
-export const GameScreen: React.FC<GameScreenProps> = ({ godName, planetName, powers, initialElements, onReset }) => {
+export const GameScreen = ({ godName, planetName, powers, initialElements, onReset }: GameScreenProps) => {
   const [elements, setElements] = useState<ElementType[]>(initialElements || [
     { id: 'air', name: 'Air', emoji: '💨', description: 'Gaseous substances' },
     { id: 'water', name: 'Water', emoji: '💧', description: 'Liquid life' },
@@ -88,35 +88,40 @@ export const GameScreen: React.FC<GameScreenProps> = ({ godName, planetName, pow
         elements
     };
     localStorage.setItem('combobox_save', JSON.stringify(saveData));
-  }, [elements, godName, planetName, powers  { id: 'earth', name: 'Earth', emoji: '🌱', description: 'Solid ground' },
-    { id: 'fire', name: 'Fire', emoji: '🔥', description: 'Energy and heat' },
-  ]);
+  }, [elements, godName, planetName, powers]);
 
-  const [logs, setLogs] = useState<string[]>([]);
+  const [logs, setLogs] = useState<{id: number, text: string}[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
-  
-  // Helper to generate image URL
-  const getPlanetImageUrl = () => {
-    const elementNames = elements.map(e => e.name).join(', ');
-    // Construct a rich prompt for the AI
-    const prompt = `hyper-realistic majestic planet ${planetName} in space, ruled by god ${godName} (${powers}), featuring landscapes of ${elementNames}, cinematic lighting, 8k resolution, detailed texture`;
-    // Encode the prompt for the URL
-    // Removing 'model=flux' as it may now be gated/moved. Using default (usually turbo)
-    return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&nologo=true&seed=${Math.floor(Math.random() * 1000)}`;
-  };
+  const [planetImage, setPlanetImage] = useState('');
 
-  // Initialize with a real AI generated image based on initial setup
-  const [planetImage, setPlanetImage] = useState(getPlanetImageUrl());
+  // Update image when elements change
+  React.useEffect(() => {
+    const elementNames = elements.map(e => e.name).join(', ');
+    const prompt = `hyper-realistic majestic planet ${planetName} in space, ruled by god ${godName} (${powers}), featuring landscapes of ${elementNames}, cinematic lighting, 8k resolution, detailed texture`;
+    const newUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&nologo=true&seed=${Math.floor(Math.random() * 1000)}`;
+    setPlanetImage(newUrl);
+  }, [elements, godName, planetName, powers]);
 
   const handleCombine = async (sourceId: string, targetId: string) => {
+    if (isGenerating) return;
+
     const source = elements.find(e => e.id === sourceId);
     const target = elements.find(e => e.id === targetId);
     
     if (!source || !target) return;
 
+    // Normalize IDs to prevent A+B being different from B+A
+    const [id1, id2] = [source.id, target.id].sort();
+    const newElementId = `${id1}-${id2}`;
+
+    if (elements.find((e: ElementType) => e.id === newElementId)) {
+        setLogs((prev: {id: number, text: string}[]) => [{ id: Date.now(), text: `The combination of ${source.name} and ${target.name} is already known.`}, ...prev]);
+        return;
+    }
+
     setIsGenerating(true);
     const newLog = `${godName} combined ${source.name} and ${target.name}...`;
-    setLogs(prev => [newLog, ...prev]);
+    setLogs((prev: {id: number, text: string}[]) => [{ id: Date.now(), text: newLog }, ...prev]);
 
     try {
       // API Configuration
@@ -173,10 +178,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({ godName, planetName, pow
            description: result.substring(0, 50) + '...'
         };
       }
-
-      const newElementId = `${source.id}-${target.id}`;
         
-      if (!elements.find(e => e.id === newElementId)) {
+      if (!elements.find((e: ElementType) => e.id === newElementId)) {
             const newElement: ElementType = {
                 id: newElementId,
                 name: parsedResult.name,
@@ -184,34 +187,27 @@ export const GameScreen: React.FC<GameScreenProps> = ({ godName, planetName, pow
                 description: parsedResult.description
             };
             
-            setElements(prev => {
-                const updated = [...prev, newElement];
-                const currentNames = updated.map(e => e.name).join(', ');
-                const newPrompt = `hyper-realistic majestic planet ${planetName} in space, ruled by god ${godName} (${powers}), featuring landscapes of ${currentNames}, cinematic lighting, 8k resolution, detailed texture`;
-                setPlanetImage(`https://image.pollinations.ai/prompt/${encodeURIComponent(newPrompt)}?width=1024&height=1024&nologo=true&seed=${Math.floor(Math.random() * 1000)}`);
-                return updated;
-            });
-
-            setLogs(prev => [`Created ${newElement.name}! The visual appearance of ${planetName} is shifting...`, ...prev]);
+            setElements((prev: ElementType[]) => [...prev, newElement]);
+            setLogs((prev: {id: number, text: string}[]) => [{ id: Date.now(), text: `Created ${newElement.name}! The visual appearance of ${planetName} is shifting...`}, ...prev]);
             
         } else {
-            setLogs(prev => [`The combination of ${source.name} and ${target.name} is already known.`, ...prev]);
+            setLogs((prev: {id: number, text: string}[]) => [{ id: Date.now(), text: `The combination of ${source.name} and ${target.name} is already known.`}, ...prev]);
         }
     } catch (err) {
         console.error("AI Generation failed:", err);
-        setLogs(prev => ["The creation failed (Check API Keys or Console). Using backup magic...", ...prev]);
+        setLogs((prev: {id: number, text: string}[]) => [{ id: Date.now(), text: "The creation failed (Check API Keys or Console). Using backup magic..."}, ...prev]);
         
         // Fallback Mock Logic
         setTimeout(() => {
-            const newElementId = `${source.id}-${target.id}`;
-             if (!elements.find(e => e.id === newElementId)) {
+             // Re-check existence in case of race condition
+             if (!elements.find((e: ElementType) => e.id === newElementId)) {
                 const newElement = {
                     id: newElementId,
                     name: `Essence of ${source.name} & ${target.name}`,
                     emoji: '✨',
                     description: 'A new manifestation created by your will.'
                 };
-                setElements(prev => [...prev, newElement]);
+                setElements((prev: ElementType[]) => [...prev, newElement]);
              }
         }, 500);
     } finally {
@@ -293,10 +289,10 @@ export const GameScreen: React.FC<GameScreenProps> = ({ godName, planetName, pow
                 <span className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Chronicle</span>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                {logs.map((log, i) => (
-                    <div key={i} className="text-sm text-gray-600 font-mono">
-                        <span className="text-gray-400 mr-2">[{logs.length - i}]</span>
-                        {log}
+                {logs.map((log) => (
+                    <div key={log.id} className="text-sm text-gray-600 font-mono">
+                        <span className="text-gray-400 mr-2">[{new Date(log.id).toLocaleTimeString()}]</span>
+                        {log.text}
                     </div>
                 ))}
             </div>
