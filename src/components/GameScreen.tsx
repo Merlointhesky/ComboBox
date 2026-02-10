@@ -3,7 +3,7 @@ import { useDrag, useDrop } from 'react-dnd';
 import { Settings, RefreshCw, ScrollText } from 'lucide-react';
 import axios from 'axios';
 
-interface ElementType {
+export interface ElementType {
   id: string;
   name: string;
   emoji: string;
@@ -14,6 +14,8 @@ interface GameScreenProps {
   godName: string;
   planetName: string;
   powers: string;
+  initialElements?: ElementType[];
+  onReset?: () => void;
 }
 
 const ItemTypes = {
@@ -67,13 +69,24 @@ const ElementCard: React.FC<ElementCardProps> = ({ element, onCombine }) => {
     </div>
   );
 };
-
-// --- Main Game Component ---
-export const GameScreen: React.FC<GameScreenProps> = ({ godName, planetName, powers }) => {
-  const [elements, setElements] = useState<ElementType[]>([
+, initialElements, onReset }) => {
+  const [elements, setElements] = useState<ElementType[]>(initialElements || [
     { id: 'air', name: 'Air', emoji: '💨', description: 'Gaseous substances' },
     { id: 'water', name: 'Water', emoji: '💧', description: 'Liquid life' },
     { id: 'earth', name: 'Earth', emoji: '🌱', description: 'Solid ground' },
+    { id: 'fire', name: 'Fire', emoji: '🔥', description: 'Energy and heat' },
+  ]);
+
+  // Persist game state
+  React.useEffect(() => {
+    const saveData = {
+        godName,
+        planetName,
+        powers,
+        elements
+    };
+    localStorage.setItem('combobox_save', JSON.stringify(saveData));
+  }, [elements, godName, planetName, powers  { id: 'earth', name: 'Earth', emoji: '🌱', description: 'Solid ground' },
     { id: 'fire', name: 'Fire', emoji: '🔥', description: 'Energy and heat' },
   ]);
 
@@ -86,7 +99,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({ godName, planetName, pow
     // Construct a rich prompt for the AI
     const prompt = `hyper-realistic majestic planet ${planetName} in space, ruled by god ${godName} (${powers}), featuring landscapes of ${elementNames}, cinematic lighting, 8k resolution, detailed texture`;
     // Encode the prompt for the URL
-    return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&model=flux&nologo=true&seed=${Math.floor(Math.random() * 1000)}`;
+    // Removing 'model=flux' as it may now be gated/moved. Using default (usually turbo)
+    return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&nologo=true&seed=${Math.floor(Math.random() * 1000)}`;
   };
 
   // Initialize with a real AI generated image based on initial setup
@@ -172,7 +186,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ godName, planetName, pow
                 const updated = [...prev, newElement];
                 const currentNames = updated.map(e => e.name).join(', ');
                 const newPrompt = `hyper-realistic majestic planet ${planetName} in space, ruled by god ${godName} (${powers}), featuring landscapes of ${currentNames}, cinematic lighting, 8k resolution, detailed texture`;
-                setPlanetImage(`https://image.pollinations.ai/prompt/${encodeURIComponent(newPrompt)}?width=1024&height=1024&model=flux&nologo=true&seed=${Math.floor(Math.random() * 1000)}`);
+                setPlanetImage(`https://image.pollinations.ai/prompt/${encodeURIComponent(newPrompt)}?width=1024&height=1024&nologo=true&seed=${Math.floor(Math.random() * 1000)}`);
                 return updated;
             });
 
@@ -225,6 +239,12 @@ export const GameScreen: React.FC<GameScreenProps> = ({ godName, planetName, pow
               />
             ))}
           </div>
+          <button 
+             onClick={onReset}
+             className="pointer-events-auto bg-white/20 hover:bg-white/40 backdrop-blur-md text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors border border-white/10"
+          >
+             Reset Universe
+          </button>
         </div>
       </div>
 
