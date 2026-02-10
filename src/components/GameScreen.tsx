@@ -124,9 +124,9 @@ export const GameScreen: React.FC<GameScreenProps> = ({ godName, planetName, pow
         "description": "Short flavor text describing the creation"
       }`;
 
-      // Call Cloudflare AI
+      // Call Cloudflare AI via local proxy to avoid CORS
       const response = await axios.post(
-        `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/ai/run/@cf/meta/llama-3-8b-instruct`,
+        `/api/cloudflare/accounts/${ACCOUNT_ID}/ai/run/@cf/meta/llama-3-8b-instruct`,
         {
           messages: [
             { role: "system", content: systemPrompt },
