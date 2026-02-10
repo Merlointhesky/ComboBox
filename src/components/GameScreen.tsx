@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
-import { RefreshCw, ScrollText } from 'lucide-react';
+import { RefreshCw, ScrollText, ChevronDown, ChevronRight } from 'lucide-react';
 import axios from 'axios';
 
 export interface ElementType {
@@ -8,6 +8,7 @@ export interface ElementType {
   name: string;
   emoji: string;
   description: string;
+  category?: 'elements' | 'animal' | 'mankind' | 'ideas' | 'science';
 }
 
 interface GameScreenProps {
@@ -26,46 +27,56 @@ const ItemTypes = {
 interface ElementCardProps {
   element: ElementType;
   onCombine: (sourceId: string, targetId: string) => void;
+  onCheckDiscovered: (id1: string, id2: string) => boolean;
 }
 
-const ElementCard = ({ element, onCombine }: ElementCardProps) => {
+const ElementCard = ({ element, onCombine, onCheckDiscovered }: ElementCardProps) => {
   const [{ isDragging }, drag] = useDrag(() => ({
     type: ItemTypes.ELEMENT,
     item: { id: element.id },
     collect: (monitor: any) => ({
       isDragging: !!monitor.isDragging(),
     }),
-  }), [element.id]); // Added dependency
+  }), [element.id]);
 
-  const [{ isOver }, drop] = useDrop(() => ({
+  const [{ isOver, draggedItem }, drop] = useDrop(() => ({
     accept: ItemTypes.ELEMENT,
     drop: (item: { id: string }) => {
-      if (item.id !== element.id) {
-        onCombine(item.id, element.id);
-      }
+      // Allow self-combination (combining element with itself)
+      onCombine(item.id, element.id);
     },
     collect: (monitor: any) => ({
       isOver: !!monitor.isOver(),
+      draggedItem: monitor.getItem(),
     }),
-  }), [element.id, onCombine]); // Added dependency
+  }), [element.id, onCombine]);
 
   // Combine refs
   const ref = (node: HTMLDivElement | null) => {
     drag(drop(node));
   };
 
+  // Check if this combination is already known
+  const isKnown = draggedItem && onCheckDiscovered(draggedItem.id, element.id);
+
   return (
     <div
       ref={ref}
       className={`
         p-4 rounded-xl shadow-sm border-2 transition-all cursor-move
-        flex flex-col items-center justify-center gap-2 aspect-square
-        ${isOver ? 'bg-pastel-pink/20 border-pastel-pink scale-105' : 'bg-white border-white/50 hover:border-pastel-blue'}
-        ${isDragging ? 'opacity-50' : 'opacity-100'}
+        flex flex-col items-center justify-center gap-2 aspect-square relative
+        ${isOver && !isKnown ? 'bg-pastel-pink/20 border-pastel-pink scale-105' : ''}
+        ${isOver && isKnown ? 'bg-gray-100 border-gray-300 scale-95 opacity-70 grayscale' : ''}
+        ${!isOver && isKnown && draggedItem ? 'opacity-40 grayscale' : ''}
+        ${!isOver && !isKnown ? 'bg-white border-white/50 hover:border-pastel-blue' : ''}
+        ${isDragging ? 'opacity-90' : 'opacity-100'}
       `}
     >
       <span className="text-4xl filter drop-shadow-sm">{element.emoji}</span>
       <span className="font-medium text-gray-700 text-sm">{element.name}</span>
+      {isKnown && draggedItem && !isDragging && (
+          <span className="absolute top-2 right-2 text-xs bg-gray-200 text-gray-500 px-1 rounded pointer-events-none">Known</span>
+      )}
     </div>
   );
 };
@@ -73,11 +84,34 @@ const ElementCard = ({ element, onCombine }: ElementCardProps) => {
 // --- Main Game Component ---
 export const GameScreen = ({ godName, planetName, powers, initialElements, onReset }: GameScreenProps) => {
   const [elements, setElements] = useState<ElementType[]>(initialElements || [
-    { id: 'air', name: 'Air', emoji: '💨', description: 'Gaseous substances' },
-    { id: 'water', name: 'Water', emoji: '💧', description: 'Liquid life' },
-    { id: 'earth', name: 'Earth', emoji: '🌱', description: 'Solid ground' },
-    { id: 'fire', name: 'Fire', emoji: '🔥', description: 'Energy and heat' },
+    { id: 'air', name: 'Air', emoji: '💨', description: 'Gaseous substances', category: 'elements' },
+    { id: 'water', name: 'Water', emoji: '💧', description: 'Liquid life', category: 'elements' },
+    { id: 'earth', name: 'Earth', emoji: '🌱', description: 'Solid ground', category: 'elements' },
+    { id: 'fire', name: 'Fire', emoji: '🔥', description: 'Energy and heat', category: 'elements' },
   ]);
+
+  // Categories Setup
+  const categories = ['elements', 'animal', 'mankind', 'ideas', 'science'];
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+      elements: true,
+      animal: true,
+      mankind: true,
+      ideas: true,
+      science: true
+  });
+
+  const toggleSection = (cat: string) => {
+      setExpandedSections(prev => ({...prev, [cat]: !prev[cat]}));
+  };
+
+  // Check if two elements have already been combined
+  const isAlreadyCombined = React.useCallback((id1: string, id2: string) => {
+      // Normalize IDs to match storage format (A-B)
+      const [a, b] = [id1, id2].sort();
+      const comboId = `${a}-${b}`;
+      // Check if any element exists with this combo ID
+      return elements.some(e => e.id === comboId);
+  }, [elements]);
 
   // Persist game state
   React.useEffect(() => {
@@ -166,79 +200,104 @@ export const GameScreen = ({ godName, planetName, powers, initialElements, onRes
     setLogs((prev: {id: number, text: string}[]) => [{ id: Date.now(), text: newLog }, ...prev]);
 
     try {
-      // API Configuration
-      const API_KEY = import.meta.env.VITE_CLOUDFLARE_API_KEY;
-      const ACCOUNT_ID = import.meta.env.VITE_CLOUDFLARE_ACCOUNT_ID;
-      
-      // Fallback for development if keys are missing (or use mock)
-      if (!API_KEY || !ACCOUNT_ID) {
-         throw new Error("Missing Cloudflare Credentials");
-      }
+      let parsedResult: any;
 
-      // Llama 3 prompt construction
-      const systemPrompt = `You are the logic engine for an alchemy evolution game.
-      Your goal is to simulate a logical progression of matter, life, and technology.
-      
-      CONCEPTUAL FRAMEWORK:
-      - Water: Acts as a "Life Giver", fluids, cleansing.
-      - Fire: Destruction (burning), but also Transformation (cooking, energy).
-      - Air: Movement/Flight, but also Erosion (destroys rocks/terrain).
-      - Earth: Solidity, Stability, Dirt, Material foundation.
-      - Abstract Concepts are allowed (e.g., Life + Time = Death).
+      // Hardcoded Recipes - Override AI
+      const sName = source.name.toLowerCase();
+      const tName = target.name.toLowerCase();
+      const combo = [sName, tName].sort().join('+');
 
-      RULES:
-      1. REALISM FIRST: Prioritize real-world results (e.g., Water + Earth = Mud, Fire + Water = Steam).
-      2. EVOLUTION: Simple elements combine into complex ones (e.g., Life + Water = Fish, Human + Metal = Robot).
-      3. NAMING: Use existing English words (e.g., "Obsidian", "Storm", "Life"). DO NOT use Latin (e.g. "Ignis") or compound nonsense (e.g. "Hydroether").
-      4. SCOPE: Include sci-fi/fantasy tropes (Dragons, Cyborgs, Magic) only when appropriate for complex inputs.
-      
-      User (God: ${godName}, Powers: ${powers}) is combining: ${source.name} + ${target.name}.
-      
-      Return ONLY a VALID JSON object with this format (ensure keys and values are double-quoted):
-      {
-        "name": "Result Name",
-        "emoji": "Relevant Emoji",
-        "description": "Short description of what this is"
-      }`;
-
-      // Call Cloudflare AI via local proxy to avoid CORS
-      const response = await axios.post(
-        `/api/cloudflare/accounts/${ACCOUNT_ID}/ai/run/@cf/meta/llama-3-8b-instruct`,
-        {
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: `Combine ${source.name} and ${target.name}` }
-          ]
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${API_KEY}`,
-            'Content-Type': 'application/json'
-          }
+      if (combo === 'mist+water') {
+         await new Promise(r => setTimeout(r, 800)); // Cinematic delay
+         parsedResult = {
+            name: "Life",
+            emoji: "🧬",
+            description: "The spark of vitality emerging from the primordial soup.",
+            category: "animal"
+         };
+      } 
+      else {
+        // AI Generation Path
+        const API_KEY = import.meta.env.VITE_CLOUDFLARE_API_KEY;
+        const ACCOUNT_ID = import.meta.env.VITE_CLOUDFLARE_ACCOUNT_ID;
+        
+        // Fallback for development if keys are missing (or use mock)
+        if (!API_KEY || !ACCOUNT_ID) {
+          throw new Error("Missing Cloudflare Credentials");
         }
-      );
 
-      const result = response.data.result.response || response.data.result; // Handle structure variation
-      
-      let parsedResult;
-      // Try to clean/parse the JSON if the model returns extra text
-      try {
-        const jsonMatch = result.match(/\{[\s\S]*\}/);
-        let jsonStr = jsonMatch ? jsonMatch[0] : result;
+        // Llama 3 prompt construction
+        const systemPrompt = `You are the logic engine for an alchemy evolution game.
+        Your goal is to simulate a logical progression of matter, life, and technology.
         
-        // Common Llama 3 bug: unquoted emojis. 
-        // Example: "emoji": 🌧️ -> "emoji": "🌧️"
-        jsonStr = jsonStr.replace(/"emoji":\s*([^"\s,{}]+)(?=[,}])/g, '"emoji": "$1"');
+        CONCEPTUAL FRAMEWORK:
+        - Water: Acts as a "Life Giver", fluids, cleansing.
+        - Fire: Destruction (burning), but also Transformation (cooking, energy).
+        - Air: Movement/Flight, but also Erosion (destroys rocks/terrain).
+        - Earth: Solidity, Stability, Dirt, Material foundation.
+        - Abstract Concepts are allowed (e.g., Life + Time = Death).
+
+        CATEGORIES:
+        Classify the result into one of these exact categories: "elements", "animal", "mankind", "ideas", "science".
+
+        RULES:
+        1. REALISM FIRST: Prioritize real-world results (e.g., Water + Earth = Mud, Fire + Water = Steam).
+        2. EVOLUTION: Simple elements combine into complex ones (e.g., Life + Water = Fish, Human + Metal = Robot).
+        3. NAMING: Use existing English words (e.g., "Obsidian", "Storm", "Life"). DO NOT use Latin (e.g. "Ignis") or compound nonsense (e.g. "Hydroether").
+        4. SCOPE: Include sci-fi/fantasy tropes (Dragons, Cyborgs, Magic) only when appropriate for complex inputs.
         
-        parsedResult = JSON.parse(jsonStr);
-      } catch (e) {
-        console.warn("Failed to parse AI response, falling back manual", result);
-        parsedResult = {
-           name: `Manifestation of ${source.name} & ${target.name}`,
-           emoji: '✨',
-           description: result.substring(0, 50) + '...'
-        };
+        User (God: ${godName}, Powers: ${powers}) is combining: ${source.name} + ${target.name}.
+        
+        Return ONLY a VALID JSON object with this format (ensure keys and values are double-quoted):
+        {
+          "name": "Result Name",
+          "emoji": "Relevant Emoji",
+          "description": "Short description of what this is",
+          "category": "category_name"
+        }`;
+
+        // Call Cloudflare AI via local proxy to avoid CORS
+        const response = await axios.post(
+          `/api/cloudflare/accounts/${ACCOUNT_ID}/ai/run/@cf/meta/llama-3-8b-instruct`,
+          {
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: `Combine ${source.name} and ${target.name}` }
+            ]
+          },
+          {
+            headers: {
+              'Authorization': `Bearer ${API_KEY}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        const result = response.data.result.response || response.data.result; // Handle structure variation
+        
+        // Try to clean/parse the JSON if the model returns extra text
+        try {
+          const jsonMatch = result.match(/\{[\s\S]*\}/);
+          let jsonStr = jsonMatch ? jsonMatch[0] : result;
+          
+          // Common Llama 3 bug: unquoted emojis. 
+          // Example: "emoji": 🌧️ -> "emoji": "🌧️"
+          jsonStr = jsonStr.replace(/"emoji":\s*([^"\s,{}]+)(?=[,}])/g, '"emoji": "$1"');
+          
+          parsedResult = JSON.parse(jsonStr);
+        } catch (e) {
+          console.warn("Failed to parse AI response, falling back manual", result);
+          parsedResult = {
+            name: `Manifestation of ${source.name} & ${target.name}`,
+            emoji: '✨',
+            description: result.substring(0, 50) + '...',
+            category: "ideas"
+          };
+        }
       }
+
+      // Race condition safety: Check "prev" state to ensure we don't duplicate
+      setElements((prev: ElementType[]) => {
         
       // Race condition safety: Check "prev" state to ensure we don't duplicate
       setElements((prev: ElementType[]) => {
@@ -264,7 +323,8 @@ export const GameScreen = ({ godName, planetName, powers, initialElements, onRes
                 id: newElementId,
                 name: parsedResult.name,
                 emoji: parsedResult.emoji,
-                description: parsedResult.description
+                description: parsedResult.description,
+                category: parsedResult.category
             };
             return [...prev, newElement];
       });
@@ -327,15 +387,57 @@ export const GameScreen = ({ godName, planetName, powers, initialElements, onRes
             </button>
           </div>
 
-          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Elements</h3>
-          <div className="grid grid-cols-2 gap-3">
-            {[...elements].reverse().map(el => (
-              <ElementCard 
-                key={el.id} 
-                element={el} 
-                onCombine={handleCombine}
-              />
-            ))}
+          <div className="space-y-3">
+             {categories.map(cat => {
+                 // Filter elements for this category
+                 // Fallback: assign no-category items to 'ideas' or a separate bin if needed, but 'ideas' is safe for now
+                 const catElements = elements.filter(e => {
+                     if (!e.category) return cat === 'ideas';
+                     return e.category === cat;
+                 });
+
+                 if (catElements.length === 0) return null;
+
+                 const isOpen = expandedSections[cat];
+                 
+                 // Check if the MOST RECENT element is in this category
+                 const lastElement = elements[elements.length - 1];
+                 const isNewestCategory = lastElement && 
+                                          (lastElement.category === cat || (!lastElement.category && cat === 'ideas')) && 
+                                          elements.length > 4; // Don't show NEW on initial load
+
+                 return (
+                    <div key={cat} className="border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm">
+                        <button 
+                            onClick={() => toggleSection(cat)}
+                            className={`w-full flex items-center justify-between p-3 text-sm font-semibold transition-colors select-none ${isNewestCategory ? 'bg-blue-50/80 text-blue-800' : 'bg-gray-50/50 text-gray-700 hover:bg-gray-100'}`}
+                        >
+                            <div className="flex items-center gap-2">
+                                {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                                <span className="capitalize">{cat}</span>
+                                <span className="text-[10px] font-bold opacity-60 bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">{catElements.length}</span>
+                            </div>
+                            {isNewestCategory && (
+                                <span className="text-[10px] font-bold bg-blue-600 text-white px-2 py-0.5 rounded shadow-sm animate-pulse tracking-wide">NEW</span>
+                            )}
+                        </button>
+                        
+                        {isOpen && (
+                            <div className="p-3 bg-white grid grid-cols-2 gap-3 transition-all">
+                                {/* Reverse sort to show newest in category first */}
+                                {[...catElements].reverse().map(el => (
+                                    <ElementCard 
+                                        key={el.id} 
+                                        element={el} 
+                                        onCombine={handleCombine}
+                                        onCheckDiscovered={isAlreadyCombined}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                 );
+             })}
           </div>
         </div>
       </div>
